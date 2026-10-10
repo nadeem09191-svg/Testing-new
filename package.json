@@ -1,0 +1,14 @@
+{
+  "name": "train-manager",
+  "version": "1.0.0",
+  "dependencies": {
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/geolocation": "^6.0.0",
+    "@capacitor/local-notifications": "^6.0.0",
+    "@capacitor-community/background-geolocation": "^1.2.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0"
+  }
+}
