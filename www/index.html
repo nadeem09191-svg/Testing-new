@@ -211,10 +211,9 @@ $('sLd').onclick=()=>{cur.ld.push({ld:$('l_ld').value,bup:$('l_bup').value,gdr:$
 $('done').onclick=()=>{cur.status='Complete';save();alert('Trip Complete save ho gaya')};
 $('nt').onclick=()=>{if(confirm('Naya trip shuru karein? Purana Records mein rahega.'))newTrip()};
 
-/* ---- Distance / nearest / place name ---- */
+/* ---- Distance / place name ---- */
 function dist(a,b,c,d){const R=6371000,r=x=>x*Math.PI/180,dl=r(c-a),dn=r(d-b);
 const h=Math.sin(dl/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
-function nearest(lat,lng){let b=null,m=1e12;stns.forEach(s=>{if(s.lat==null)return;const d=dist(lat,lng,s.lat,s.lng);if(d<m){m=d;b=s}});return{s:b,d:m}}
 async function placeName(lat,lng){
  try{
   const q=`[out:json][timeout:15];node(around:1500,${lat},${lng})[railway~"station|halt"];out body 10;`;
@@ -252,10 +251,14 @@ function refreshTrip(){
 function gpsFill(i){
  toast('Location le raha hoon...');
  getPos(async p=>{
-  const la=p.coords.latitude,ln=p.coords.longitude,n=nearest(la,ln);
-  let name=(n.s&&n.d<3000)?n.s.n:await placeName(la,ln);
+  const la=p.coords.latitude,ln=p.coords.longitude;
+  let best=null,m=1e12;
+  stns.concat(AUTO).forEach(s=>{if(s.lat==null)return;const d=dist(la,ln,s.lat,s.lng);if(d<m){m=d;best=s}});
+  let name=(best&&m<2000)?best.n:await placeName(la,ln);
   if(!name)return toast('Jagah ka naam nahi mila, manually likho');
-  us(i,'stn',name);if(!cur.sts[i].arr)us(i,'arr',nowT());stRender();toast('Station: '+name)},gerr)}
+  let idx=i;
+  if(cur.sts[i]&&cur.sts[i].stn){cur.sts.push({stn:'',arr:'',dep:'',rem:''});idx=cur.sts.length-1}
+  us(idx,'stn',name);stRender();toast('Station: '+name)},gerr)}
 
 /* ---- Saved stations ---- */
 $('sgps').onclick=()=>{
@@ -272,26 +275,31 @@ stns.push({n,lat:tmpLoc?tmpLoc.lat:null,lng:tmpLoc?tmpLoc.lng:null});saveSt();tm
 function sRender(){$('sList').innerHTML=stns.map((s,i)=>`<div class="item"><span>${esc(s.n)} ${s.lat!=null?'📍':'(no GPS)'}</span><button onclick="stDel(${i})">X</button></div>`).join('')||'<p>Koi station saved nahi</p>'}
 function stDel(i){stns.splice(i,1);saveSt();sRender();dlist()}
 
-/* ---- Speedometer + auto station tracking ---- */
+/* ---- Auto station fetch ---- */
 let AUTO=LS('tm_auto',[]),lastQ=null,lastTry=0,querying=false;
 async function fetchAuto(la,ln){
- if(querying||Date.now()-lastTry<30000)return;
+ if(querying||Date.now()-lastTry<20000)return;
  if(lastQ&&dist(la,ln,lastQ.la,lastQ.ln)<3000)return;
  querying=true;lastTry=Date.now();
- try{
-  const q=`[out:json][timeout:20];node(around:6000,${la},${ln})[railway~"station|halt"][station!~"subway|light_rail"];out body 40;`;
-  const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q)});
-  const j=await r.json();
-  (j.elements||[]).forEach(e=>{
-   const n=e.tags&&(e.tags['name:en']||e.tags.name);
-   if(!n)return;
-   if(!AUTO.some(a=>a.n==n&&dist(a.lat,a.lng,e.lat,e.lon)<300))AUTO.push({n,lat:e.lat,lng:e.lon})});
-  if(AUTO.length>600)AUTO=AUTO.slice(-600);
-  localStorage.setItem('tm_auto',JSON.stringify(AUTO));
-  lastQ={la,ln};
- }catch(e){}
+ const q=`[out:json][timeout:25];nwr(around:7000,${la},${ln})[railway~"station|halt"][station!~"subway|light_rail|monorail"];out center 80;`;
+ const hosts=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://overpass.private.coffee/api/interpreter'];
+ for(const h of hosts){
+  try{
+   const r=await fetch(h,{method:'POST',body:'data='+encodeURIComponent(q)});
+   const j=await r.json();
+   (j.elements||[]).forEach(e=>{
+    const n=e.tags&&(e.tags['name:en']||e.tags.name);
+    const lt=e.lat!=null?e.lat:(e.center&&e.center.lat),lg=e.lon!=null?e.lon:(e.center&&e.center.lon);
+    if(!n||lt==null)return;
+    if(!AUTO.some(a=>a.n==n&&dist(a.lat,a.lng,lt,lg)<300))AUTO.push({n,lat:lt,lng:lg})});
+   if(AUTO.length>800)AUTO=AUTO.slice(-800);
+   localStorage.setItem('tm_auto',JSON.stringify(AUTO));
+   lastQ={la,ln};break;
+  }catch(e){}
+ }
  querying=false}
 
+/* ---- Speedometer + auto tracking ---- */
 let S=LS('tm_spd',{km:0,t0:0,mx:0,run:false}),wid=null,starting=false,last=null,lastP=null,wl=null,vis={},fixes=0;
 const R_IN=500,R_OUT=800,SLOW=4,MOVE=8,STOPSEC=15;
 function sUpd(sp){
