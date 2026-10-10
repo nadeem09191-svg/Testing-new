@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="hi"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Train Manager</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:sans-serif;background:#f1f5f9;color:#111}
+header{background:#1e40af;color:#fff;padding:14px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:5}
+header b{font-size:18px}
+#menu{font-size:24px;background:none;border:0;color:#fff}
+#side{position:fixed;top:0;left:-270px;width:260px;height:100%;background:#fff;z-index:20;transition:.25s;padding-top:20px;box-shadow:2px 0 8px #0004;overflow:auto}
+#side.open{left:0}
+#side a{display:block;padding:14px 20px;border-bottom:1px solid #eee;font-size:16px}
+#ov{display:none;position:fixed;inset:0;background:#0006;z-index:10}
+#ov.open{display:block}
+main{padding:12px;padding-bottom:80px}
+.card{background:#fff;border-radius:10px;padding:12px;margin-bottom:12px;box-shadow:0 1px 3px #0002}
+label{font-size:13px;color:#555;display:block;margin-top:8px}
+input,select{width:100%;padding:10px;font-size:16px;border:1px solid #bbb;border-radius:6px}
+button.b{width:100%;padding:12px;margin-top:10px;border:0;border-radius:8px;font-size:16px;background:#1e40af;color:#fff}
+button.g{background:#15803d}button.r{background:#b91c1c}button.o{background:#ea580c}button.s{padding:8px;font-size:14px}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.item{background:#eef2ff;border-radius:6px;padding:8px;margin-top:8px;font-size:14px;display:flex;justify-content:space-between;gap:8px}
+.item button{border:0;background:#b91c1c;color:#fff;border-radius:4px;padding:4px 10px}
+.tag{font-size:12px;padding:2px 8px;border-radius:10px;color:#fff}
+.inc{background:#ea580c}.com{background:#15803d}
+.hide{display:none}
+.big{font-size:64px;text-align:center;font-weight:bold;color:#1e40af}
+.stat{display:flex;justify-content:space-around;text-align:center}.stat b{font-size:24px;display:block}
+#toast{position:fixed;bottom:20px;left:10px;right:10px;background:#111;color:#fff;padding:14px;border-radius:8px;z-index:30;display:none}
+</style></head><body>
+
+<header><button id="menu">☰</button><b id="title">New Trip</b></header>
+<div id="ov"></div>
+<div id="toast"></div>
+<div id="side">
+<a data-v="new">🚆 New Trip / Details</a>
+<a data-v="trip">🛤 Start Trip (Stations)</a>
+<a data-v="st">📍 Saved Stations</a>
+<a data-v="spd">⏱ Speedometer / Auto Tracking</a>
+<a data-v="rec">📋 Records</a>
+<a id="bk">💾 Backup (JSON)</a>
+<a id="rs">♻ Restore Backup</a>
+<input type="file" id="rsf" class="hide" accept=".json">
+</div>
+
+<main>
+<section id="v_new">
+<div class="card">
+<label>S/on Time</label><input id="f_son" data-k="son" type="time">
+<label>T.No.</label><input id="f_tno" data-k="tno">
+<label>Eng No.</label><input id="f_eng" data-k="eng">
+<label>LP Name</label><input id="f_lp" data-k="lp">
+<label>Date & Time (auto)</label><input id="f_dt" data-k="dt" type="datetime-local">
+</div>
+<div class="card">
+<button class="b" id="bBpc">➕ Enter BPC Details</button>
+<div id="fBpc" class="hide">
+<label>BPC No.</label><input id="b_no">
+<label>Intern Stn.</label><input id="b_stn" list="stl">
+<label>Intern Date</label><input id="b_date" type="date">
+<label>BP %</label><input id="b_pct" type="number">
+<label>BPC Type</label><input id="b_type">
+<button class="b g" id="sBpc">Save BPC</button>
+</div>
+<div id="lBpc"></div>
+</div>
+<div class="card">
+<button class="b o" id="bLd">➕ Enter LD</button>
+<div id="fLd" class="hide">
+<label>LD</label><input id="l_ld">
+<label>B/Up</label><input id="l_bup">
+<label>GDR Details</label><input id="l_gdr">
+<label>LV No.</label><input id="l_lv">
+<button class="b g" id="sLd">Save LD</button>
+</div>
+<div id="lLd"></div>
+</div>
+<button class="b g" id="goTrip">▶ Start Trip (Station Entry)</button>
+<button class="b" id="done">✅ Trip Complete</button>
+<button class="b" id="rep">📤 Share Report</button>
+<button class="b o" id="dlb">⬇ Download Report</button>
+<button class="b r" id="nt">🆕 Naya Trip (purana Records mein rahega)</button>
+</section>
+
+<section id="v_trip" class="hide">
+<div class="card"><b id="tinfo"></b>
+<button class="b g" id="addSt">➕ Add Station Entry</button></div>
+<div id="stList"></div>
+</section>
+
+<section id="v_st" class="hide">
+<div class="card">
+<label>Station Name</label><input id="sn">
+<button class="b o" id="sgps">📍 Use Current GPS Location (naam auto)</button>
+<div id="sloc" style="font-size:13px;margin-top:6px"></div>
+<button class="b g" id="sSave">Save Station</button>
+</div>
+<div id="sList"></div>
+</section>
+
+<section id="v_spd" class="hide">
+<div class="card">
+<div class="big"><span id="sp">0</span><small style="font-size:20px"> km/h</small></div>
+<div class="stat"><div><b id="avg">0</b>Avg km/h</div><div><b id="km">0.00</b>Total km</div><div><b id="mx">0</b>Max km/h</div></div>
+<div id="sinfo" style="text-align:center;margin-top:8px;font-size:13px;color:#555"></div>
+<button class="b g" id="sStart">▶ Start (Background Auto Tracking)</button>
+<button class="b r" id="sStop">⏹ Stop</button>
+<button class="b o" id="sReset">↺ Reset</button>
+</div>
+<p style="font-size:12px;color:#666">Start karne par aas-paas ke railway stations khud fetch hote hain, aur Arr/Dep time Start Trip mein khud bharte jayenge. Phone mein location "Allow all the time" aur Battery "No restrictions" rakho.</p>
+</section>
+
+<section id="v_rec" class="hide">
+<div class="card">
+<label>Search (T.No / Eng / LP)</label><input id="q">
+<div class="row"><div><label>Date</label><input id="qd" type="date"></div>
+<div><label>Status</label><select id="qs"><option value="">All</option><option>Incomplete</option><option>Complete</option></select></div></div>
+</div>
+<div id="list"></div>
+</section>
+</main>
+<datalist id="stl"></datalist>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+const LS=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}};
+let trips=LS('tm_trips',[]), stns=LS('tm_stns',[]), cur=null, tmpLoc=null;
+trips.forEach(t=>{t.sts=t.sts||[];t.bpc=t.bpc||[];t.ld=t.ld||[];t.dt=t.dt||'';t.status=t.status||'Incomplete'});
+const save=()=>{try{localStorage.setItem('tm_trips',JSON.stringify(trips))}catch(e){toast('Save nahi ho paya: '+e.message)}};
+const saveSt=()=>localStorage.setItem('tm_stns',JSON.stringify(stns));
+function nowStr(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)}
+function nowT(){return nowStr().slice(11,16)}
+function tStr(ms){const d=new Date(ms);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(11,16)}
+function toast(m){const t=$('toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',5000)}
+try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
+
+/* ---- Native plugins ---- */
+const NATIVE=(()=>{try{return !!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform())}catch(e){return false}})();
+let BG=null;
+try{if(NATIVE)BG=Capacitor.registerPlugin('BackgroundGeolocation')}catch(e){}
+const CG=()=>window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.Geolocation;
+let LN=null;
+try{if(NATIVE)LN=Capacitor.Plugins.LocalNotifications||Capacitor.registerPlugin('LocalNotifications')}catch(e){}
+
+function notify(t,b){
+ toast(t+': '+b);
+ if(navigator.vibrate)navigator.vibrate([300,150,300]);
+ if(LN){try{LN.schedule({notifications:[{id:Math.floor(Math.random()*1e9),title:t,body:b}]}).catch(()=>{})}catch(e){}}
+ else try{if(window.Notification&&Notification.permission=='granted')new Notification(t,{body:b})}catch(e){}}
+
+/* ---- GPS helpers ---- */
+async function getPos(ok,bad){
+ const g=CG();let p=null;
+ if(g){
+  try{await g.requestPermissions();p=await g.getCurrentPosition({enableHighAccuracy:true,timeout:20000})}
+  catch(e){return bad(e)}
+  return ok(p)}
+ if(!navigator.geolocation)return bad({message:'GPS support nahi'});
+ navigator.geolocation.getCurrentPosition(ok,bad,{enableHighAccuracy:true,timeout:20000})}
+async function watchPos(ok,bad){
+ if(BG){
+  try{
+   const id=await BG.addWatcher({backgroundTitle:'Train Manager chalu hai',backgroundMessage:'Trip aur station record ho raha hai',requestPermissions:true,stale:false,distanceFilter:0},(l,e)=>{
+    if(e){if(e.code==='NOT_AUTHORIZED'&&confirm('Location "Allow all the time" chahiye. Settings kholein?'))BG.openSettings();return bad(e)}
+    if(l)ok({coords:{latitude:l.latitude,longitude:l.longitude,accuracy:l.accuracy,speed:(l.speed!=null&&l.speed>=0)?l.speed:null},timestamp:l.time||Date.now()})});
+   return {bg:id}}catch(e){bad(e);return null}}
+ const g=CG();
+ if(g){
+  try{await g.requestPermissions();
+   const id=await g.watchPosition({enableHighAccuracy:true,timeout:20000},(p,e)=>{if(p)ok(p);else if(e)bad(e)});
+   return {pl:id}}catch(e){bad(e);return null}}
+ if(!navigator.geolocation){bad({message:'GPS support nahi'});return null}
+ return {web:navigator.geolocation.watchPosition(ok,bad,{enableHighAccuracy:true,maximumAge:0,timeout:20000})}}
+function clearWatch(w){if(!w)return;
+ if(w.bg!=null&&BG)BG.removeWatcher({id:w.bg});
+ if(w.pl!=null&&CG())CG().clearWatch({id:w.pl});
+ if(w.web!=null)navigator.geolocation.clearWatch(w.web)}
+const gerr=e=>toast('GPS nahi mila: '+((e&&e.message)||'location permission/GPS check karo'));
+
+/* ---- Trip basics ---- */
+function newTrip(){cur={id:Date.now(),son:'',tno:'',eng:'',lp:'',dt:nowStr(),bpc:[],ld:[],sts:[],status:'Incomplete'};trips.unshift(cur);localStorage.setItem('tm_cur',cur.id);save();render()}
+function openTrip(id){cur=trips.find(t=>t.id==id);localStorage.setItem('tm_cur',id);render();show('new')}
+const V=['new','trip','st','spd','rec'],T={new:'New Trip',trip:'Start Trip',st:'Saved Stations',spd:'Speedometer',rec:'Records'};
+function show(v){V.forEach(x=>$('v_'+x).classList.toggle('hide',x!=v));$('title').textContent=T[v];
+if(v=='rec')list();if(v=='trip'){if(!cur.sts.length){cur.sts.push({stn:'',arr:'',dep:'',rem:''});save()}stRender()}
+if(v=='st')sRender();side(false);window.scrollTo(0,0)}
+function side(o){$('side').classList.toggle('open',o);$('ov').classList.toggle('open',o)}
+$('menu').onclick=()=>side(true);$('ov').onclick=()=>side(false);
+document.querySelectorAll('#side a[data-v]').forEach(a=>a.onclick=()=>show(a.dataset.v));
+$('goTrip').onclick=()=>show('trip');
+
+function render(){
+['son','tno','eng','lp','dt'].forEach(k=>$('f_'+k).value=cur[k]||'');
+lists();dlist()}
+document.querySelectorAll('[data-k]').forEach(e=>e.oninput=()=>{cur[e.dataset.k]=e.value;save()});
+function dlist(){$('stl').innerHTML=stns.map(s=>`<option value="${esc(s.n)}">`).join('')}
+
+function lists(){
+$('lBpc').innerHTML=cur.bpc.map((b,i)=>`<div class="item"><span>BPC ${esc(b.no)} | ${esc(b.stn)} | ${esc(b.date)} | ${esc(b.pct)}% | ${esc(b.type)}</span><button onclick="del('bpc',${i})">X</button></div>`).join('');
+$('lLd').innerHTML=cur.ld.map((b,i)=>`<div class="item"><span>LD ${esc(b.ld)} | B/Up ${esc(b.bup)} | GDR ${esc(b.gdr)} | LV ${esc(b.lv)}</span><button onclick="del('ld',${i})">X</button></div>`).join('')}
+function del(k,i){cur[k].splice(i,1);save();lists()}
+$('bBpc').onclick=()=>$('fBpc').classList.toggle('hide');
+$('bLd').onclick=()=>$('fLd').classList.toggle('hide');
+$('sBpc').onclick=()=>{cur.bpc.push({no:$('b_no').value,stn:$('b_stn').value,date:$('b_date').value,pct:$('b_pct').value,type:$('b_type').value});
+['b_no','b_stn','b_date','b_pct','b_type'].forEach(i=>$(i).value='');save();lists()};
+$('sLd').onclick=()=>{cur.ld.push({ld:$('l_ld').value,bup:$('l_bup').value,gdr:$('l_gdr').value,lv:$('l_lv').value});
+['l_ld','l_bup','l_gdr','l_lv'].forEach(i=>$(i).value='');save();lists()};
+$('done').onclick=()=>{cur.status='Complete';save();alert('Trip Complete save ho gaya')};
+$('nt').onclick=()=>{if(confirm('Naya trip shuru karein? Purana Records mein rahega.'))newTrip()};
+
+/* ---- Distance / nearest / place name ---- */
+function dist(a,b,c,d){const R=6371000,r=x=>x*Math.PI/180,dl=r(c-a),dn=r(d-b);
+const h=Math.sin(dl/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+function nearest(lat,lng){let b=null,m=1e12;stns.forEach(s=>{if(s.lat==null)return;const d=dist(lat,lng,s.lat,s.lng);if(d<m){m=d;b=s}});return{s:b,d:m}}
+async function placeName(lat,lng){
+ try{
+  const q=`[out:json][timeout:15];node(around:1500,${lat},${lng})[railway~"station|halt"];out body 10;`;
+  const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q)});
+  const j=await r.json();let b=null,m=1e12;
+  (j.elements||[]).forEach(e=>{const d=dist(lat,lng,e.lat,e.lon);
+   if(e.tags&&e.tags.name&&d<m){m=d;b=e.tags['name:en']||e.tags.name}});
+  if(b)return b;
+ }catch(e){}
+ try{
+  const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=16&accept-language=en&lat=${lat}&lon=${lng}`);
+  const j=await r.json();const a=j.address||{};
+  return a.railway||a.village||a.suburb||a.town||a.city||a.county||(j.display_name||'').split(',')[0]||'';
+ }catch(e){}
+ return '';
+}
+
+/* ---- Station entries ---- */
+function stRender(){
+$('tinfo').textContent='T.No '+(cur.tno||'-')+' | Eng '+(cur.eng||'-');
+$('stList').innerHTML=cur.sts.map((s,i)=>`<div class="card">
+<label>Station Name</label><input list="stl" value="${esc(s.stn)}" oninput="us(${i},'stn',this.value)">
+<button class="b o s" onclick="gpsFill(${i})">📍 Fetch from GPS</button>
+<div class="row"><div><label>Arr Time</label><input type="time" id="a${i}" value="${esc(s.arr)}" oninput="us(${i},'arr',this.value)"><button class="b s" onclick="nowSet(${i},'arr')">Now</button></div>
+<div><label>Dep Time</label><input type="time" id="d${i}" value="${esc(s.dep)}" oninput="us(${i},'dep',this.value)"><button class="b s" onclick="nowSet(${i},'dep')">Now</button></div></div>
+<label>Remark</label><input value="${esc(s.rem)}" oninput="us(${i},'rem',this.value)">
+<button class="b r s" onclick="delSt(${i})">Delete</button></div>`).join('')||'<p>Koi station entry nahi</p>'}
+function us(i,k,v){cur.sts[i][k]=v;save()}
+function nowSet(i,k){const v=nowT();us(i,k,v);$((k=='arr'?'a':'d')+i).value=v}
+function delSt(i){if(confirm('Delete?')){cur.sts.splice(i,1);save();stRender()}}
+$('addSt').onclick=()=>{cur.sts.push({stn:'',arr:'',dep:'',rem:''});save();stRender()};
+function refreshTrip(){
+ const a=document.activeElement;
+ if(!$('v_trip').classList.contains('hide')&&!(a&&(a.tagName=='INPUT')))stRender()}
+function gpsFill(i){
+ toast('Location le raha hoon...');
+ getPos(async p=>{
+  const la=p.coords.latitude,ln=p.coords.longitude,n=nearest(la,ln);
+  let name=(n.s&&n.d<3000)?n.s.n:await placeName(la,ln);
+  if(!name)return toast('Jagah ka naam nahi mila, manually likho');
+  us(i,'stn',name);if(!cur.sts[i].arr)us(i,'arr',nowT());stRender();toast('Station: '+name)},gerr)}
+
+/* ---- Saved stations ---- */
+$('sgps').onclick=()=>{
+ $('sloc').textContent='Location le raha hoon...';
+ getPos(async p=>{
+  tmpLoc={lat:p.coords.latitude,lng:p.coords.longitude};
+  $('sloc').textContent='Jagah dhundh raha hoon...';
+  const n=await placeName(tmpLoc.lat,tmpLoc.lng);
+  if(n)$('sn').value=n;
+  $('sloc').textContent='📍 '+(n||'Naam nahi mila, manually likho')+' ('+tmpLoc.lat.toFixed(4)+', '+tmpLoc.lng.toFixed(4)+')'},
+  e=>{$('sloc').textContent='';gerr(e)})};
+$('sSave').onclick=()=>{const n=$('sn').value.trim();if(!n)return toast('Station naam likho');
+stns.push({n,lat:tmpLoc?tmpLoc.lat:null,lng:tmpLoc?tmpLoc.lng:null});saveSt();tmpLoc=null;$('sn').value='';$('sloc').textContent='';sRender();dlist()};
+function sRender(){$('sList').innerHTML=stns.map((s,i)=>`<div class="item"><span>${esc(s.n)} ${s.lat!=null?'📍':'(no GPS)'}</span><button onclick="stDel(${i})">X</button></div>`).join('')||'<p>Koi station saved nahi</p>'}
+function stDel(i){stns.splice(i,1);saveSt();sRender();dlist()}
+
+/* ---- Speedometer + auto station tracking ---- */
+let AUTO=LS('tm_auto',[]),lastQ=null,lastTry=0,querying=false;
+async function fetchAuto(la,ln){
+ if(querying||Date.now()-lastTry<30000)return;
+ if(lastQ&&dist(la,ln,lastQ.la,lastQ.ln)<3000)return;
+ querying=true;lastTry=Date.now();
+ try{
+  const q=`[out:json][timeout:20];node(around:6000,${la},${ln})[railway~"station|halt"][station!~"subway|light_rail"];out body 40;`;
+  const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q)});
+  const j=await r.json();
+  (j.elements||[]).forEach(e=>{
+   const n=e.tags&&(e.tags['name:en']||e.tags.name);
+   if(!n)return;
+   if(!AUTO.some(a=>a.n==n&&dist(a.lat,a.lng,e.lat,e.lon)<300))AUTO.push({n,lat:e.lat,lng:e.lon})});
+  if(AUTO.length>600)AUTO=AUTO.slice(-600);
+  localStorage.setItem('tm_auto',JSON.stringify(AUTO));
+  lastQ={la,ln};
+ }catch(e){}
+ querying=false}
+
+let S=LS('tm_spd',{km:0,t0:0,mx:0,run:false}),wid=null,starting=false,last=null,lastP=null,wl=null,vis={},fixes=0;
+const R_IN=500,R_OUT=800,SLOW=4,MOVE=8,STOPSEC=15;
+function sUpd(sp){
+$('sp').textContent=Math.round(sp);
+const hrs=S.t0?(Date.now()-S.t0)/36e5:0;
+$('avg').textContent=hrs>0?(S.km/hrs).toFixed(1):'0';
+$('km').textContent=S.km.toFixed(2);$('mx').textContent=Math.round(S.mx);
+if(!wid)$('sinfo').textContent='Band'}
+
+function onPos(p){
+ fixes++;
+ const c=p.coords,ts=p.timestamp||Date.now();
+ let sp=null;
+ if(c.speed!=null&&c.speed>=0)sp=c.speed*3.6;
+ else if(lastP){
+  const dt=(ts-lastP.t)/1000,d=dist(lastP.lat,lastP.lng,c.latitude,c.longitude);
+  if(dt>0)sp=(d<Math.max(5,c.accuracy/2))?0:d/dt*3.6}
+ if(sp==null)sp=0;
+ lastP={lat:c.latitude,lng:c.longitude,t:ts};
+ if(last){const d=dist(last.lat,last.lng,c.latitude,c.longitude);
+  if(c.accuracy<100&&d>8){S.km+=d/1000;last={lat:c.latitude,lng:c.longitude}}}
+ else last={lat:c.latitude,lng:c.longitude};
+ if(sp>S.mx)S.mx=sp;
+ localStorage.setItem('tm_spd',JSON.stringify(S));
+ sUpd(sp);
+ $('sinfo').textContent='Fixes: '+fixes+' | Acc: '+Math.round(c.accuracy)+' m | Speed: '+sp.toFixed(0)+' | Stns: '+AUTO.length;
+ if(c.accuracy<=150){fetchAuto(c.latitude,c.longitude);if(cur)proximity(c.latitude,c.longitude,sp,ts)}}
+
+function proximity(la,ln,sp,ts){
+ const all=stns.concat(AUTO.filter(a=>!stns.some(s=>s.n==a.n&&s.lat!=null)));
+ all.forEach(s=>{
+  if(s.lat==null)return;
+  const d=dist(la,ln,s.lat,s.lng);let v=vis[s.n];
+  if(!v){
+   if(d<R_IN){
+    const row={stn:s.n,arr:'',dep:'',rem:'Aa raha hai'};
+    cur.sts.push(row);save();
+    vis[s.n]={row,minD:d,minT:ts,slow:0,stopped:false,done:false};
+    notify('🚉 '+s.n,'Station aa raha hai');refreshTrip()}
+   return}
+  if(d<v.minD){v.minD=d;v.minT=ts}
+  if(!v.done){
+   if(sp<SLOW){
+    if(!v.slow)v.slow=ts;
+    if(!v.stopped&&ts-v.slow>=STOPSEC*1000){
+     v.stopped=true;v.row.arr=tStr(v.slow);v.row.rem='Ruki';save();
+     notify('🛑 '+s.n,'Train ruki, Arr '+v.row.arr);refreshTrip()}
+   }else{
+    if(!v.stopped)v.slow=0;
+    if(v.stopped&&sp>MOVE){
+     v.row.dep=tStr(ts);v.done=true;save();
+     notify('▶ '+s.n,'Train chali, Dep '+v.row.dep);refreshTrip()}}}
+  if(d>R_OUT){
+   if(!v.done){
+    if(v.stopped){v.row.dep=tStr(ts);notify('▶ '+s.n,'Dep '+v.row.dep)}
+    else{v.row.dep=tStr(v.minT);v.row.rem='Pass (Through)';notify('⏩ '+s.n,'Pass, Dep '+v.row.dep)}
+    save();refreshTrip()}
+   delete vis[s.n]}
+ })}
+
+async function wake(){try{if(navigator.wakeLock)wl=await navigator.wakeLock.request('screen')}catch(e){}}
+async function startTrack(){
+if(wid||starting)return;starting=true;
+try{if(LN)await LN.requestPermissions();else if(window.Notification&&Notification.permission=='default')Notification.requestPermission()}catch(e){}
+if(!S.t0)S.t0=Date.now();S.run=true;
+wid=await watchPos(onPos,gerr);starting=false;
+if(!wid){S.run=false;return}
+$('sinfo').textContent='Tracking chalu hai, GPS ka wait...';
+if(!BG)wake();sUpd(0)}
+function stopTrack(){clearWatch(wid);wid=null;vis={};S.run=false;localStorage.setItem('tm_spd',JSON.stringify(S));if(wl){try{wl.release()}catch(e){}wl=null}sUpd(0)}
+$('sStart').onclick=startTrack;$('sStop').onclick=stopTrack;
+$('sReset').onclick=()=>{if(confirm('Reset?')){stopTrack();S={km:0,t0:0,mx:0,run:false};last=null;lastP=null;fixes=0;localStorage.setItem('tm_spd',JSON.stringify(S));sUpd(0)}};
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&wid&&!BG)wake()});
+sUpd(0);
+
+/* ---- Report ---- */
+function report(t){
+let s=`🚆 TRAIN REPORT\nS/on Time: ${t.son}\nT.No: ${t.tno}\nEng No: ${t.eng}\nLP: ${t.lp}\nDate/Time: ${t.dt.replace('T',' ')}\n`;
+s+=`\n--- BPC ---\n`+(t.bpc.map((b,i)=>`${i+1}. BPC ${b.no}, Stn ${b.stn}, Date ${b.date}, BP ${b.pct}%, Type ${b.type}`).join('\n')||'None');
+s+=`\n\n--- LD ---\n`+(t.ld.map((b,i)=>`${i+1}. LD ${b.ld}, B/Up ${b.bup}, GDR ${b.gdr}, LV ${b.lv}`).join('\n')||'None');
+return s}
+async function share(t){const x=report(t);
+if(navigator.share){try{await navigator.share({title:'Train Report',text:x})}catch(e){}}
+else{try{await navigator.clipboard.writeText(x);alert('Report copy ho gayi')}catch(e){alert(x)}}}
+function download(t){const a=document.createElement('a');
+a.href=URL.createObjectURL(new Blob([report(t)],{type:'text/plain'}));
+a.download='Train_'+(t.tno||t.id)+'.txt';a.click()}
+$('rep').onclick=()=>share(cur);$('dlb').onclick=()=>download(cur);
+
+/* ---- Records ---- */
+function list(){
+const q=$('q').value.toLowerCase(),d=$('qd').value,s=$('qs').value;
+const r=trips.filter(t=>(t.tno||t.eng||t.lp||t.son||t.bpc.length||t.ld.length||t.sts.length)
+&&(!q||[t.tno,t.eng,t.lp].join(' ').toLowerCase().includes(q))
+&&(!d||t.dt.startsWith(d))&&(!s||t.status==s));
+$('list').innerHTML=r.map(t=>`<div class="card"><div onclick="openTrip(${t.id})">
+<b>T.No ${esc(t.tno)||'-'}</b> | Eng ${esc(t.eng)||'-'} <span class="tag ${t.status=='Complete'?'com':'inc'}">${t.status}</span><br>
+LP: ${esc(t.lp)||'-'}<br><small>${t.dt.replace('T',' ')} | BPC ${t.bpc.length} | LD ${t.ld.length} | Stn ${t.sts.length}</small></div>
+<div class="row"><button class="b" onclick="share(trips.find(x=>x.id==${t.id}))">Share</button>
+<button class="b o" onclick="download(trips.find(x=>x.id==${t.id}))">Download</button>
+<button class="b r" onclick="rm(${t.id})">Delete</button></div></div>`).join('')||'<p>Koi record nahi</p>'}
+['q','qd','qs'].forEach(i=>$(i).oninput=list);
+function rm(id){if(confirm('Delete?')){trips=trips.filter(t=>t.id!=id);save();if(cur&&cur.id==id){cur=trips[0]||null;if(!cur)newTrip();else render()}list()}}
+
+/* ---- Backup / Restore ---- */
+$('bk').onclick=()=>{const a=document.createElement('a');
+a.href=URL.createObjectURL(new Blob([JSON.stringify({trips,stns})],{type:'application/json'}));
+a.download='trainmanager_backup.json';a.click()};
+$('rs').onclick=()=>$('rsf').click();
+$('rsf').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+r.onload=()=>{try{const d=JSON.parse(r.result);trips=d.trips||[];stns=d.stns||[];
+trips.forEach(t=>{t.sts=t.sts||[];t.bpc=t.bpc||[];t.ld=t.ld||[];t.dt=t.dt||''});
+save();saveSt();cur=trips[0]||null;if(!cur)newTrip();else render();alert('Restore ho gaya')}catch(x){alert('File galat hai')}};r.readAsText(f)};
+
+/* ---- Start ---- */
+cur=trips.find(t=>t.id==localStorage.getItem('tm_cur'))||trips[0]||null;
+if(!cur)newTrip();else{localStorage.setItem('tm_cur',cur.id);render()}
+if(S.run)startTrack();
+</script></body></html>
